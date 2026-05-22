@@ -15,7 +15,7 @@ retrieval:
   ivfflat_probes: 10
 
 split:
-  mini_size: 3000
+  mini_size: 500
   eval_frac: 0.10
   seed: 42
 
