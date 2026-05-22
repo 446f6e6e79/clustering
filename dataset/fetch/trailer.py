@@ -24,7 +24,7 @@ def _ydl_opts(
                               ``"firefox"``). Ignored when *cookiefile* is set.
     """
     opts: dict = {
-        "format": "worstvideo[height>=360][ext=mp4]/worst[ext=mp4]/worst",
+        "format": "worstvideo[height>=240][ext=mp4]/worstvideo[height>=240]/worst[ext=mp4]/worst",
         "outtmpl": str(outdir / "%(id)s.%(ext)s"),
         "quiet": True,
         "no_warnings": True,
