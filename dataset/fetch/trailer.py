@@ -28,6 +28,11 @@ def _ydl_opts(
     """
     opts: dict = {
         "format": "wv*[height>=240][ext=mp4]/wv*[ext=mp4]/wv*/best",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv", "mweb", "web_safari", "web"],
+            },
+        },
         "outtmpl": str(outdir / "%(id)s.%(ext)s"),
         "quiet": True,
         "no_warnings": True,
