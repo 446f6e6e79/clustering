@@ -9,6 +9,9 @@ from tqdm.auto import tqdm
 
 from backend.settings import get_settings
 from core.image_encoder import encode_images
+# dataset.fetch.trailer is an external-source fetcher; it stays in dataset/fetch/
+# alongside tmdb.py. This is the only core → dataset dependency — accepted
+# because fetch_frames is the sole I/O boundary for YouTube and belongs there.
 from dataset.fetch.trailer import fetch_frames
 
 log = logging.getLogger(__name__)
@@ -40,8 +43,8 @@ def encode_trailers(
     extracted, each frame is encoded by ``core.image_encoder.encode_images``,
     the per-frame embeddings are mean-pooled and L2-normalized. Rows for
     movies with no ``youtube_key`` (None) or whose trailer fetch fails end up
-    as all-zero — this matches the "missing modality" semantics expected by
-    ``core.fusion.fuse_batch``.
+    as all-zero — they are excluded from multi-modal distance matrices when
+    using ``core.fusion.combined_distance_matrix``.
 
     Args:
         movie_keys: List of ``(movie_id, youtube_key)`` pairs. ``movie_id``
