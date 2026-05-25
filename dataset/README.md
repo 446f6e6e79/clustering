@@ -21,7 +21,7 @@ python -m dataset.scraper --limit 500 --concurrency 5   # smoke test first
 python -m dataset.scraper --upload                      # full run + push to HF snapshots/
 ```
 
-Writes raw JSONL to `data/local_scrape/tmdb_raw.jsonl` (resumes on restart) and a cleaned `snapshot_YYYYMMDD.parquet` to the same directory. With `--upload` the parquet is pushed to the HF dataset repo under `snapshots/`. Paste the printed path into `configs/default.yaml` under `ingestion.artifacts.snapshot`.
+Writes raw JSONL to `data/local_scrape/tmdb_raw.jsonl` (resumes on restart) and a cleaned `snapshot_YYYYMMDD.parquet` to the same directory. With `--upload` the parquet is pushed to the HF dataset repo under `snapshots/`. Paste the printed path into `configs/dev.yaml` under `ingestion.artifacts.snapshot`.
 
 **Required env vars:** `TMDB_API_KEY`. Optional: `CINEPAL_ARTIFACTS_REPO` (HF repo ID), `HF_TOKEN` (private repos only).
 
@@ -32,8 +32,8 @@ Run on a Colab T4 GPU instance.
 1. Open `notebooks/embed_in_colab.ipynb`.
 2. Add Colab secrets: `HF_TOKEN`, optional `GITHUB_TOKEN` for private repo clone.
 3. Mount Google Drive when prompted — trailer embedding shards are saved there so the job can resume if a Colab session ends before all trailers are embedded.
-4. Run all cells. The notebook downloads the snapshot pinned in `configs/default.yaml`, splits into mini/main/eval-holdout sets, embeds text on GPU, embeds trailers in resumable shards (persisted on Google Drive), and uploads three timestamped parquets via `dataset.hub.upload.upload_artifacts` under `embeddings/`.
-5. Paste the three printed paths into `configs/default.yaml` under `ingestion.artifacts.{main,mini,eval_holdout}`. The new artifact paths become part of `config_hash`, so existing conversations remain replayable against the snapshot they were created with.
+4. Run all cells. The notebook downloads the snapshot pinned in `configs/dev.yaml`, splits into mini/main/eval-holdout sets, embeds text on GPU, embeds trailers in resumable shards (persisted on Google Drive), and uploads three timestamped parquets via `dataset.hub.upload.upload_artifacts` under `embeddings/`.
+5. Paste the three printed paths into `configs/dev.yaml` under `ingestion.artifacts.{main,mini,eval_holdout}`. The new artifact paths become part of `config_hash`, so existing conversations remain replayable against the snapshot they were created with.
 
 ---
 
@@ -49,7 +49,7 @@ Modules are grouped by *what they do*, not by which pipeline stage uses them.
 | `embed/trailer.py` | Trailer-specific orchestration: frames → `core.image_encoder.encode_images` → mean-pool |
 | `transform/clean.py` | Filter, deduplicate, and normalise raw TMDB JSONL into a cleaned DataFrame |
 | `transform/split.py` | Produce mini / main / eval-holdout splits |
-| `transform/offline.py` | Offline pipeline: `core.fusion.fuse_batch` → UMAP 2D → `core.clustering.hdbscan_soft`. Called by `db.ingest` |
+| `transform/offline.py` | Offline pipeline: `core.fusion.fuse_batch` → UMAP 50D → HDBSCAN → UMAP 2D (visualization). Called by `db.ingest` |
 | `hub/upload.py` | Push timestamped parquets to HuggingFace Hub |
 | `hub/fetch.py` | Download a pinned artifact from HuggingFace Hub (shared with `db.ingest`) |
 

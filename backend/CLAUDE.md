@@ -74,7 +74,7 @@ Agent-internal dataclasses that come from LLM output carry:
 ```python
 @dataclass(frozen=True, slots=True)
 class IntentResult:
-    mode: NavigationMode
+  navigationMode: NavigationMode
     ...
 
     @classmethod
@@ -82,13 +82,66 @@ class IntentResult:
         ...
 ```
 
-The agent calls `IntentResult.from_llm_response(parsed, raw_content=resp.content)`. All normalisation logic (enum coercion, UUID parsing, fallback values) lives on the dataclass, not scattered in agent code. For plain-text LLM responses (no structured JSON), the signature accepts the content string directly:
+The agent calls `IntentResult.from_llm_response(parsed, raw_content=resp.content)`. All normalisation logic (UUID parsing, fallback values) lives on the dataclass, not scattered in agent code. For plain-text LLM responses (no structured JSON), the signature accepts the content string directly:
 
 ```python
 @classmethod
 def from_llm_response(cls, content: str, ...) -> "ExplanationResult":
     return cls(text=content, ...)
 ```
+
+---
+
+## Agent module conventions
+
+Every agent under `backend/agents/<name>/` must follow this layout:
+
+```
+backend/agents/<name>/
+  agent.py        # Thin orchestrator: render prompt → harness call → parse → log → return
+  types.py        # XLLMResponse(BaseModel) wire schema + XResult(@dataclass frozen/slots)
+  parser.py       # (Optional) Pure functions for parsing when side effects are needed
+  scoring.py      # (Optional) Pure scoring/utility functions unrelated to the LLM call
+  prompts/
+    <fn>_v1.j2    # Versioned Jinja2 templates — keep old files for replay
+    <fn>_v2.j2    # New version; agent.py loads the latest
+  __init__.py     # Empty
+```
+
+**Canonical agent shape** (`intent` agent is the reference implementation):
+
+1. `types.py` defines exactly two types:
+   - `XLLMResponse(BaseModel)` — Pydantic wire schema matching the JSON the LLM returns.
+   - `XResult(@dataclass(frozen=True, slots=True))` — internal result. Must include a
+     `cost: float` field populated from `resp.cost_usd`. Carries a
+     `from_llm_response(cls, parsed, cost, ...)` classmethod for all normalization logic
+     (UUID coercion, enum mapping, fallbacks). No I/O in `from_llm_response`.
+
+2. `agent.py` is a thin async function:
+   ```python
+   template = _ENV.get_template("intent_v2.j2")
+   prompt = template.render(...)
+   resp = await llm_harness.call(..., response_schema=XLLMResponse)
+   parsed: XLLMResponse = resp.parsed
+   result = XResult.from_llm_response(parsed, cost=resp.cost_usd, ...)
+   log.info(...)
+   return result
+   ```
+   No branching on `parsed` fields, no numpy math, no DB calls.
+
+3. When parsing requires side effects (embedding lookups, vector search), move that
+   logic into `parser.py` as plain functions (`parse_concept`, `build_linear_axis`, …).
+   `agent.py` calls into `parser.py`; the dataclass classmethod stays pure.
+
+4. **No fallback returns on parse failure.** Raise `LLMParseError` or a `DomainError`
+   subclass and let the global handler translate. The harness already retries transient
+   errors; silent fallbacks hide real bugs.
+
+5. **Prompt versioning:** every prompt change = new `_vN.j2` file. Old files stay for
+   replay. Update the `get_template("..._vN.j2")` call in `agent.py`.
+
+6. **Cost aggregation:** the coordinator accumulates cost via `result.cost` on each
+   agent's return value. Never re-inspect `LLMResponse.cost_usd` outside the agent.
 
 ---
 

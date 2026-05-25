@@ -193,10 +193,11 @@ def create_memberships(memberships: list[tuple[uuid.UUID, int, float]]) -> None:
     if not memberships:
         return
     with transaction() as conn:
-        conn.executemany(
-            "INSERT INTO cluster_memberships (cluster_id, movie_id, probability) VALUES (%s, %s, %s)",
-            memberships,
-        )
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO cluster_memberships (cluster_id, movie_id, probability) VALUES (%s, %s, %s)",
+                memberships,
+            )
     log.debug("memberships_inserted", extra={"count": len(memberships)})
 
 
@@ -346,10 +347,23 @@ def create_root_snapshot_from_assignments(
             """
             INSERT INTO cluster_snapshots (parent_id, operation, params, config_hash)
             VALUES (NULL, 'base', %s, %s)
+            ON CONFLICT (parent_id, operation, params, config_hash) DO NOTHING
             RETURNING id
             """,
             (json.dumps(canon_params), config_hash),
         ).fetchone()
+        if row is None:
+            existing = conn.execute(
+                """
+                SELECT id FROM cluster_snapshots
+                WHERE parent_id IS NULL AND operation = 'base'
+                  AND params = %s::jsonb AND config_hash = %s
+                LIMIT 1
+                """,
+                (json.dumps(canon_params), config_hash),
+            ).fetchone()
+            log.info("root_snapshot_already_exists", extra={"snapshot_id": str(existing["id"])})
+            return existing["id"]
         snapshot_id: uuid.UUID = row["id"]
 
         cluster_uuid_map: dict[int, uuid.UUID] = {}
@@ -370,10 +384,11 @@ def create_root_snapshot_from_assignments(
             (cluster_uuid_map[cid], movie_id, prob)
             for movie_id, cid, prob in zip(movie_ids, cluster_ids, cluster_probs)
         ]
-        conn.executemany(
-            "INSERT INTO cluster_memberships (cluster_id, movie_id, probability) VALUES (%s, %s, %s)",
-            membership_rows,
-        )
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO cluster_memberships (cluster_id, movie_id, probability) VALUES (%s, %s, %s)",
+                membership_rows,
+            )
 
     log.info(
         "root_snapshot_created",

@@ -20,7 +20,7 @@ https://github.com/user-attachments/assets/b308d0ea-cb32-4a1b-897f-7ba45f78df00
 - [`db/README.md`](db/README.md) — Postgres migrations and loading pre-built HF artifacts.
 - [`dataset/README.md`](dataset/README.md) — Offline data pipeline: TMDB scrape → Colab embed → HF upload.
 - [`demo/README.md`](demo/README.md) — Record/replay demo scripts
-- [`eval/README.md`](eval/README.md) — Offline evaluation harness (forthcoming).
+- `eval/` — Offline evaluation harness (forthcoming).
 
 
 ---
@@ -84,7 +84,7 @@ docker run -d \
 # 4. Apply migrations
 python -m db.apply
 
-# 5. Ingest catalogue (mini set — fast, ingestion artifact pinned in configs/default.yaml)
+# 5. Ingest catalogue (mini set — fast, ingestion artifact pinned in configs/dev.yaml)
 python -m db.ingest
 # Producing a fresh snapshot is two stages — scrape locally, embed in Colab:
 #   python -m dataset.scraper --upload    # stage 1: TMDB → HF (snapshots/)

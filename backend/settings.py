@@ -14,7 +14,7 @@ BACKEND_DIR: Path = PROJECT_ROOT / "backend"
 DATA_DIR: Path = PROJECT_ROOT / "data"
 ARTIFACTS_DIR: Path = DATA_DIR / "artifacts"
 CONFIGS_DIR: Path = PROJECT_ROOT / "configs"
-DEFAULT_CONFIG_PATH: Path = CONFIGS_DIR / "default.yaml"
+DEFAULT_CONFIG_PATH: Path = CONFIGS_DIR / "dev.yaml"
 MIGRATIONS_DIR: Path = PROJECT_ROOT / "db" / "migrations"
 LOGS_DIR: Path = PROJECT_ROOT / "logs"
 
@@ -144,14 +144,75 @@ class FusionConfig(BaseModel):
 
 
 class UmapConfig(BaseModel):
-    """UMAP 2D projection parameters for offline visualization coordinates.
+    """UMAP parameters for visualization and pre-clustering dimensionality reduction.
+
+    Two independent UMAP passes are used:
+    - Visualization: 2D projection of the fused embedding space for the cluster map.
+    - Clustering: intermediate reduction to ``clustering_n_components`` dimensions
+      applied before HDBSCAN to reduce the curse of dimensionality.
 
     Attributes:
-        n_neighbors: UMAP neighbourhood size.
-        min_dist:    Minimum distance between points in the projected space.
+        n_neighbors:                UMAP neighbourhood size for the 2D visualization pass.
+        min_dist:                   Minimum distance between points in the 2D projection.
+        clustering_n_components:    Target dimensionality for the pre-HDBSCAN reduction.
+        clustering_n_neighbors:     UMAP neighbourhood size for the clustering pass.
+        clustering_min_dist:        min_dist for the clustering UMAP (0.0 keeps clusters
+                                    tighter and is the BERTopic-recommended value).
+        clustering_min_dataset_size: Minimum number of points required to apply the
+                                    pre-clustering UMAP. Smaller subsets skip the reduction
+                                    step and pass embeddings directly to HDBSCAN.
     """
     n_neighbors: int = 15
     min_dist: float = 0.1
+    clustering_n_components: int = 50
+    clustering_n_neighbors: int = 15
+    clustering_min_dist: float = 0.0
+    clustering_min_dataset_size: int = 150
+
+
+class LabelingConfig(BaseModel):
+    """Labeling agent parameters.
+
+    Attributes:
+        top_exemplars: Maximum number of exemplar movies to pass to the
+                       labeling LLM. Truncates the exemplar list in both
+                       the online labeler and the clustering helpers.
+    """
+    top_exemplars: int = 15
+
+
+class IntentConfig(BaseModel):
+    """Intent agent parameters.
+
+    Attributes:
+        confidence_threshold: Minimum confidence below which the coordinator
+                              refuses to execute state-changing operations and
+                              defers to the clarifier agent instead.
+    """
+    confidence_threshold: float = 0.6
+
+
+class SuggestionsConfig(BaseModel):
+    """Post-turn suggestion parameters.
+
+    Attributes:
+        enabled:                  When False, the suggester is skipped entirely
+                                  (no LLM call, no suggestion field on the response).
+        similar_pair_distance_max: Cosine-distance threshold (range [0, 2]) below which
+                                   two cluster centroids are considered similar enough
+                                   to suggest a merge.
+        dominance_fraction:        Fraction of total members a single cluster must hold
+                                   to trigger a drill-down suggestion.
+        noise_fraction_floor:      Fraction of low-probability memberships above which a
+                                   recut suggestion is emitted (noise proxy).
+        top_n_signals:             Maximum number of deterministic signals forwarded to
+                                   the suggester LLM.
+    """
+    enabled: bool = True
+    similar_pair_distance_max: float = 0.25
+    dominance_fraction: float = 0.55
+    noise_fraction_floor: float = 0.20
+    top_n_signals: int = 2
 
 
 class ConversationConfig(BaseModel):
@@ -201,7 +262,10 @@ class Settings(BaseModel):
         representation: Embedding model configuration.
         clustering:     HDBSCAN base + online parameters.
         fusion:         Embedding fusion weights.
-        umap:           UMAP 2D projection parameters.
+        umap:           UMAP parameters for 2D visualization and pre-clustering reduction.
+        labeling:       Labeling agent parameters.
+        intent:         Intent agent parameters (confidence threshold).
+        suggestions:    Post-turn suggestion parameters.
         conversation:   Per-conversation limits.
         ingestion:      HF artifact source.
     """
@@ -212,6 +276,9 @@ class Settings(BaseModel):
     clustering: ClusteringConfig = ClusteringConfig()
     fusion: FusionConfig = FusionConfig()
     umap: UmapConfig = UmapConfig()
+    labeling: LabelingConfig = LabelingConfig()
+    intent: IntentConfig = IntentConfig()
+    suggestions: SuggestionsConfig = SuggestionsConfig()
     conversation: ConversationConfig = ConversationConfig()
     ingestion: IngestionConfig
 
@@ -299,12 +366,6 @@ def get_settings() -> Settings:
     """
     path = os.environ.get("CONFIG_PATH", str(DEFAULT_CONFIG_PATH))
     data, _ = _load_raw(path)
-    representation = data.get("representation", {})
-    if isinstance(representation, dict):
-        if "model" not in representation and "strategy" in representation:
-            representation["model"] = representation.pop("strategy")
-        if "embedding_dim" not in representation and "dim" in representation:
-            representation["embedding_dim"] = representation.pop("dim")
     return Settings(**data)
 
 
