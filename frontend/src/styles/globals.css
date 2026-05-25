@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@layer base {
+    :root {
+        --bg: #f4efe8;
+        --surface: #fdfaf7;
+        --elevated: #e9ddd2;
+        --border: #d4c3b3;
+        --text: #2c241f;
+        --muted: #7b6d62;
+        --primary: #b86b52;
+        --accent: #d8a56d;
+        --node-glow: #de7f61;
+        --radius: 0.625rem;
+        --font-display: "Playfair Display", Georgia, serif;
+        --font-sans: "Inter", system-ui, sans-serif;
+    }
+
+    [data-theme="dark"] {
+        --bg: #26211f;
+        --surface: #332b28;
+        --elevated: #443833;
+        --border: #5b4c46;
+        --text: #f4ede7;
+        --muted: #b4a59b;
+        --primary: #e28c6f;
+        --accent: #efbf84;
+        --node-glow: #ff9e7a;
+    }
+
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    html {
+        font-family: var(--font-sans);
+        color-scheme: light;
+    }
+
+    [data-theme="dark"] html {
+        color-scheme: dark;
+    }
+
+    body {
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        overflow: hidden;
+    }
+
+    h1,
+    h2,
+    h3 {
+        font-family: var(--font-display);
+    }
+}
+
+.scrollbar-styled {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.scrollbar-styled::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.scrollbar-styled::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-styled::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.scrollbar-styled::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
+
+@theme {
+    --color-bg: var(--bg);
+    --color-surface: var(--surface);
+    --color-elevated: var(--elevated);
+    --color-border: var(--border);
+    --color-text: var(--text);
+    --color-muted: var(--muted);
+    --color-primary: var(--primary);
+    --color-accent: var(--accent);
+    --color-node-glow: var(--node-glow);
+    --font-display: var(--font-display);
+    --font-sans: var(--font-sans);
+    --radius-ui: var(--radius);
+}
